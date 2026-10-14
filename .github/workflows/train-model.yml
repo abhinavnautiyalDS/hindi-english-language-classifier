@@ -6,9 +6,12 @@ on:
     paths:
       - "data/sample.csv"
       - "src/**"
+      - "scripts/**"
       - "tests/**"
       - "train.py"
       - "requirements.txt"
+      - "DATASET_CARD.md"
+      - ".gitignore"
       - ".github/workflows/train-model.yml"
   workflow_dispatch:
 
@@ -31,9 +34,13 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
-      - name: Train, evaluate, and serialize model
+      - name: Build and clean the dataset
+        run: python scripts/build_dataset.py
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Train and evaluate models
         run: python train.py
-      - name: Commit generated model and evaluation
+      - name: Commit trained model and evaluation
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -41,7 +48,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No model changes to commit."
           else
-            git commit -m "Add trained classifier model and evaluation"
+            git commit -m "Train classifier on cleaned COMI-LINGUA corpus"
             git fetch origin main
             git rebase origin/main
             git push origin HEAD:main
