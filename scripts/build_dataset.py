@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from collections import Counter
 from pathlib import Path
 
 import pandas as pd
@@ -46,30 +47,36 @@ def normalize_text(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def choose_columns(frame: pd.DataFrame) -> tuple[str, str]:
+def choose_columns(frame: pd.DataFrame) -> tuple[str, list[str], str]:
     normalized = {col: re.sub(r"[^a-z0-9]+", "", str(col).lower()) for col in frame.columns}
     text_candidates = [
         col for col, name in normalized.items()
         if any(key in name for key in ("sentence", "utterance", "text", "transcript"))
     ]
+    if not text_candidates:
+        raise ValueError(f"Could not identify sentence column. Found: {list(frame.columns)}")
+    text_col = sorted(text_candidates, key=lambda c: (("sentence" not in normalized[c]), len(normalized[c])))[0]
+
+    # Prefer the three human annotation columns over the model's predicted tags.
+    annotator_cols = [
+        col for col, name in normalized.items()
+        if "annotator" in name and "annotatedby" in name
+    ]
+    if len(annotator_cols) >= 2:
+        return text_col, annotator_cols, "majority vote across human annotators"
+
     tag_candidates = [
         col for col, name in normalized.items()
         if any(key in name for key in ("lid", "languagetag", "languagelabel", "tags", "label"))
-        and col not in text_candidates
+        and col != text_col
     ]
-    if not text_candidates or not tag_candidates:
-        raise ValueError(
-            "Could not identify sentence and token-language-tag columns. "
-            f"Found columns: {list(frame.columns)}"
-        )
-    text_col = sorted(text_candidates, key=lambda c: (("sentence" not in normalized[c]), len(normalized[c])))[0]
+    if not tag_candidates:
+        raise ValueError(f"Could not identify language-tag column. Found: {list(frame.columns)}")
     tag_col = sorted(tag_candidates, key=lambda c: (("lid" not in normalized[c] and "tag" not in normalized[c]), len(normalized[c])))[0]
-    return text_col, tag_col
+    return text_col, [tag_col], "single available language-tag column"
 
 
 def sentence_label(tags_value: object) -> str | None:
-    # COMI-LINGUA labels words with hi/en/other tags. A dominant-language
-    # threshold keeps short English loanwords from forcing every sentence to Hinglish.
     tags = re.findall(r"(?<![a-z])(hi|en|ot|other)(?![a-z])", str(tags_value).lower())
     hi_count = tags.count("hi")
     en_count = tags.count("en")
@@ -85,13 +92,29 @@ def sentence_label(tags_value: object) -> str | None:
     return "hinglish"
 
 
+def majority_sentence_label(annotation_values: list[object]) -> str | None:
+    labels = [label for value in annotation_values if (label := sentence_label(value)) is not None]
+    if not labels:
+        return None
+    counts = Counter(labels)
+    label, votes = counts.most_common(1)[0]
+    if len(annotation_values) == 1:
+        return label
+    # Require a majority among usable annotators; ties/all-different are discarded.
+    usable = len(labels)
+    if votes > usable / 2:
+        return label
+    return None
+
+
 def convert_split(split: str, raw_path: Path) -> tuple[pd.DataFrame, dict]:
     frame = pd.read_csv(raw_path, low_memory=False)
-    text_col, tag_col = choose_columns(frame)
+    text_col, tag_cols, annotation_method = choose_columns(frame)
     print(f"{split}: source columns = {list(frame.columns)}")
+    print(f"{split}: language labels from {tag_cols} ({annotation_method})")
     data = pd.DataFrame({
         "text": frame[text_col].map(normalize_text),
-        "label": frame[tag_col].map(sentence_label),
+        "label": frame[tag_cols].apply(lambda row: majority_sentence_label(row.tolist()), axis=1),
     })
     before = len(data)
     data = data.dropna(subset=["label"])
@@ -104,12 +127,13 @@ def convert_split(split: str, raw_path: Path) -> tuple[pd.DataFrame, dict]:
     audit = {
         "source_split": split,
         "input_rows": before,
-        "rows_with_usable_language_tags": after_label_filter,
+        "rows_with_usable_majority_labels": after_label_filter,
         "rows_after_exact_casefold_deduplication": len(data),
         "dropped_rows": before - len(data),
         "label_counts": counts,
         "text_column": text_col,
-        "tag_column": tag_col,
+        "tag_columns": tag_cols,
+        "annotation_method": annotation_method,
     }
     return data, audit
 
@@ -122,12 +146,14 @@ def main() -> None:
         "dataset": SOURCE_NAME,
         "source_url": SOURCE_URL,
         "license": SOURCE_LICENSE,
-        "label_rule": f"hi ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => hindi; en ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => english; otherwise hinglish; ot/other ignored",
+        "annotation_method": "Majority vote across the three human annotator tag sequences when available; predicted tags are only a fallback.",
+        "label_rule": f"per annotator: hi ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => hindi; en ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => english; otherwise hinglish; ot/other ignored; ties discarded",
         "cleaning": [
             "Unicode NFKC normalization",
             "remove zero-width/BOM characters",
             "collapse whitespace",
-            "drop rows without usable hi/en language tags",
+            "majority vote over human annotations rather than predicted tags",
+            "drop rows without a majority language label",
             "drop empty/very short texts",
             "case-insensitive exact deduplication within each official split",
             "remove training rows that overlap the official test set",
