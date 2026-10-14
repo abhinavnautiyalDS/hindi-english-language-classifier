@@ -1,0 +1,129 @@
+{
+  "warning": "Bundled data is a tiny smoke test; metrics are not production estimates.",
+  "selected_model": "logistic_regression",
+  "labels": [
+    "hindi",
+    "english",
+    "hinglish"
+  ],
+  "results": {
+    "logistic_regression": {
+      "train_seconds": 0.011930388999985553,
+      "accuracy": 0.8,
+      "macro_f1": 0.7777777777777777,
+      "classification_report": {
+        "hindi": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1-score": 0.6666666666666666,
+          "support": 1.0
+        },
+        "english": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 2.0
+        },
+        "hinglish": {
+          "precision": 1.0,
+          "recall": 0.5,
+          "f1-score": 0.6666666666666666,
+          "support": 2.0
+        },
+        "accuracy": 0.8,
+        "macro avg": {
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "f1-score": 0.7777777777777777,
+          "support": 5.0
+        },
+        "weighted avg": {
+          "precision": 0.9,
+          "recall": 0.8,
+          "f1-score": 0.8,
+          "support": 5.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          1
+        ]
+      ],
+      "latency": {
+        "p50_ms": 1.4421574999943232,
+        "p95_ms": 2.027176549985654
+      }
+    },
+    "linear_svm": {
+      "train_seconds": 0.005294999000000189,
+      "accuracy": 0.8,
+      "macro_f1": 0.7777777777777777,
+      "classification_report": {
+        "hindi": {
+          "precision": 0.5,
+          "recall": 1.0,
+          "f1-score": 0.6666666666666666,
+          "support": 1.0
+        },
+        "english": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1-score": 1.0,
+          "support": 2.0
+        },
+        "hinglish": {
+          "precision": 1.0,
+          "recall": 0.5,
+          "f1-score": 0.6666666666666666,
+          "support": 2.0
+        },
+        "accuracy": 0.8,
+        "macro avg": {
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "f1-score": 0.7777777777777777,
+          "support": 5.0
+        },
+        "weighted avg": {
+          "precision": 0.9,
+          "recall": 0.8,
+          "f1-score": 0.8,
+          "support": 5.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          1
+        ]
+      ],
+      "latency": {
+        "p50_ms": 1.3837730000005877,
+        "p95_ms": 1.4707529999995472
+      }
+    }
+  }
+}
