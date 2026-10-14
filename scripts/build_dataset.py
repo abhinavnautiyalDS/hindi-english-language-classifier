@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 import unicodedata
+import zipfile
 from collections import Counter
 from pathlib import Path
 
@@ -21,12 +24,17 @@ COMI_FILES = {
     "test": "https://huggingface.co/datasets/LingoIITGN/COMI-LINGUA/resolve/main/LID_test.csv?download=true",
 }
 PHINC_URL = "https://huggingface.co/datasets/LingoIITGN/PHINC/resolve/main/PHINC.csv?download=true"
+TATOEBA_URL = "https://www.manythings.org/anki/hin-eng.zip"
+
 COMI_NAME = "COMI-LINGUA (Lingo Research Group, IIT Gandhinagar)"
 COMI_LICENSE = "CC BY-SA 4.0 (conservative interpretation; upstream GitHub repository declares CC-BY-SA-4.0)"
 PHINC_NAME = "PHINC (Parallel Hinglish Social Media Code-Mixed Corpus)"
 PHINC_LICENSE = "CC BY 4.0"
+TATOEBA_NAME = "Tatoeba English-Hindi sentence pairs (ManyThings.org selection)"
+TATOEBA_LICENSE = "CC BY 2.0 France"
 COMI_URL = "https://github.com/lingo-iitgn/COMI-LINGUA"
 PHINC_SOURCE_URL = "https://huggingface.co/datasets/LingoIITGN/PHINC"
+TATOEBA_SOURCE_URL = "https://www.manythings.org/anki/hin-eng.zip"
 
 
 def download(url: str, target: Path) -> None:
@@ -102,9 +110,7 @@ def majority_sentence_label(annotation_values: list[object]) -> str | None:
     label, votes = counts.most_common(1)[0]
     if len(annotation_values) == 1:
         return label
-    if votes > len(labels) / 2:
-        return label
-    return None
+    return label if votes > len(labels) / 2 else None
 
 
 def convert_comi_split(split: str, raw_path: Path) -> tuple[pd.DataFrame, dict]:
@@ -152,9 +158,7 @@ def build_phinc_splits(raw_path: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict
     ]
     if not english_candidates or not mixed_candidates:
         raise ValueError(f"Could not identify PHINC Hinglish/English columns. Found: {list(frame.columns)}")
-    english_col = english_candidates[0]
-    mixed_col = mixed_candidates[0]
-
+    english_col, mixed_col = english_candidates[0], mixed_candidates[0]
     pairs = pd.DataFrame({
         "hinglish": frame[mixed_col].map(normalize_text),
         "english": frame[english_col].map(normalize_text),
@@ -162,12 +166,10 @@ def build_phinc_splits(raw_path: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict
     pairs = pairs[(pairs["hinglish"].str.len() >= 2) & (pairs["english"].str.len() >= 2)]
     pairs["pair_key"] = pairs["hinglish"].str.casefold() + "\u241f" + pairs["english"].str.casefold()
     pairs = pairs.drop_duplicates(subset=["pair_key"]).drop(columns=["pair_key"]).reset_index(drop=True)
-
     order = np.random.default_rng(42).permutation(len(pairs))
     cut = int(round(len(pairs) * 0.80))
-    split_indices = {"train": order[:cut], "test": order[cut:]}
     result = {}
-    for split, indices in split_indices.items():
+    for split, indices in {"train": order[:cut], "test": order[cut:]}.items():
         selected = pairs.iloc[indices]
         rows = []
         for row in selected.itertuples(index=False):
@@ -189,6 +191,60 @@ def build_phinc_splits(raw_path: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict
         },
     }
     return result["train"], result["test"], audit
+
+
+def build_tatoeba_splits(raw_path: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict, pd.DataFrame]:
+    with zipfile.ZipFile(raw_path) as archive:
+        text_files = [name for name in archive.namelist() if name.lower().endswith(".txt")]
+        if not text_files:
+            raise ValueError("Tatoeba archive contains no text file.")
+        source_file = sorted(text_files, key=lambda name: ("hin" not in name.lower(), len(name)))[0]
+        with archive.open(source_file) as handle:
+            decoded = io.TextIOWrapper(handle, encoding="utf-8-sig", errors="replace")
+            records = []
+            for line in decoded:
+                parts = next(csv.reader([line.rstrip("\r\n")], delimiter="\t"))
+                if len(parts) < 2:
+                    continue
+                english, hindi = normalize_text(parts[0]), normalize_text(parts[1])
+                attribution = normalize_text(parts[2]) if len(parts) >= 3 else ""
+                if len(english) < 2 or len(hindi) < 2:
+                    continue
+                records.append({"english": english, "hindi": hindi, "attribution": attribution})
+
+    pairs = pd.DataFrame(records)
+    pairs["pair_key"] = pairs["english"].str.casefold() + "\u241f" + pairs["hindi"].str.casefold()
+    pairs = pairs.drop_duplicates(subset=["pair_key"]).drop(columns=["pair_key"]).reset_index(drop=True)
+    order = np.random.default_rng(17).permutation(len(pairs))
+    cut = int(round(len(pairs) * 0.80))
+    result = {}
+    for split, indices in {"train": order[:cut], "test": order[cut:]}.items():
+        selected = pairs.iloc[indices]
+        rows = []
+        for row in selected.itertuples(index=False):
+            rows.append({"text": row.hindi, "label": "hindi", "source": "Tatoeba"})
+            rows.append({"text": row.english, "label": "english", "source": "Tatoeba"})
+        result[split] = pd.DataFrame(rows, columns=["text", "label", "source"])
+
+    # Keep the original attribution field alongside the paired text for CC BY compliance.
+    attribution_path = ROOT / "DATASET_ATTRIBUTION_TATOEBA.tsv"
+    pairs[["english", "hindi", "attribution"]].to_csv(
+        attribution_path, sep="\t", index=False, encoding="utf-8"
+    )
+    audit = {
+        "dataset": TATOEBA_NAME,
+        "source_url": TATOEBA_SOURCE_URL,
+        "license": TATOEBA_LICENSE,
+        "source_file": source_file,
+        "clean_unique_pairs": len(pairs),
+        "split_rule": "deterministic 80/20 split by paired row; English and Hindi sentence pair stay in same split",
+        "attribution_file": "DATASET_ATTRIBUTION_TATOEBA.tsv",
+        "label_counts": {
+            split: {label: int((df["label"] == label).sum()) for label in LABELS}
+            for split, df in result.items()
+        },
+    }
+    return result["train"], result["test"], audit, pairs
 
 
 def clean_combined(frame: pd.DataFrame) -> pd.DataFrame:
@@ -215,9 +271,17 @@ def main() -> None:
     download(PHINC_URL, phinc_path)
     phinc_train, phinc_test, phinc_audit = build_phinc_splits(phinc_path)
 
+    tatoeba_path = RAW_DIR / "hin-eng.zip"
+    download(TATOEBA_URL, tatoeba_path)
+    tatoeba_train, tatoeba_test, tatoeba_audit, _ = build_tatoeba_splits(tatoeba_path)
+
     frames = {
-        "train": clean_combined(pd.concat([comi_frames["train"], phinc_train], ignore_index=True)),
-        "test": clean_combined(pd.concat([comi_frames["test"], phinc_test], ignore_index=True)),
+        "train": clean_combined(pd.concat(
+            [comi_frames["train"], phinc_train, tatoeba_train], ignore_index=True
+        )),
+        "test": clean_combined(pd.concat(
+            [comi_frames["test"], phinc_test, tatoeba_test], ignore_index=True
+        )),
     }
     test_keys = set(frames["test"]["text"].str.casefold())
     before = len(frames["train"])
@@ -226,7 +290,7 @@ def main() -> None:
     ].reset_index(drop=True)
 
     audit = {
-        "dataset": "COMI-LINGUA + PHINC",
+        "dataset": "COMI-LINGUA + PHINC + Tatoeba English-Hindi",
         "source_url": COMI_URL,
         "sources": [
             {
@@ -239,22 +303,29 @@ def main() -> None:
                 "name": PHINC_NAME,
                 "url": PHINC_SOURCE_URL,
                 "license": PHINC_LICENSE,
-                "use": "Hinglish source text and human English translations; paired rows split together",
+                "use": "Romanized Hinglish source text and human English translations; paired rows split together",
+            },
+            {
+                "name": TATOEBA_NAME,
+                "url": TATOEBA_SOURCE_URL,
+                "license": TATOEBA_LICENSE,
+                "use": "monolingual Hindi and English examples; paired rows split together; attribution retained in DATASET_ATTRIBUTION_TATOEBA.tsv",
             },
         ],
-        "license": "COMI-LINGUA: conservatively treated as CC BY-SA 4.0; PHINC: CC BY 4.0. See DATASET_CARD.md.",
-        "label_rule": f"COMI per-annotator: hi ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => hindi; en ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => english; otherwise hinglish; majority vote across human annotators; PHINC source text => hinglish and human translation => english",
+        "license": "COMI-LINGUA conservatively treated as CC BY-SA 4.0; PHINC CC BY 4.0; Tatoeba CC BY 2.0 France. See DATASET_CARD.md and attribution file.",
+        "label_rule": f"COMI per-annotator: hi ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => hindi; en ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => english; otherwise hinglish; majority vote across human annotators; PHINC source => hinglish and translation => english; Tatoeba pair => hindi/english",
         "cleaning": [
             "Unicode NFKC normalization",
             "remove zero-width/BOM characters and collapse whitespace",
             "majority vote across human COMI-LINGUA annotators; discard ties",
             "drop empty/very short text",
             "deduplicate exact case-insensitive text within each combined split",
-            "split PHINC by translation pair before expanding to two labeled examples",
+            "split PHINC and Tatoeba by paired row before expanding labels",
             "remove exact train/test text overlap across all sources",
         ],
         "comi_splits": comi_audit,
         "phinc": phinc_audit,
+        "tatoeba": tatoeba_audit,
         "train_test_overlap_removed": before - len(frames["train"]),
         "final_label_counts": {
             split: {label: int((df["label"] == label).sum()) for label in LABELS}
