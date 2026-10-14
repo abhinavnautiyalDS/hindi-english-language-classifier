@@ -24,7 +24,7 @@ COMI_FILES = {
     "test": "https://huggingface.co/datasets/LingoIITGN/COMI-LINGUA/resolve/main/LID_test.csv?download=true",
 }
 PHINC_URL = "https://huggingface.co/datasets/LingoIITGN/PHINC/resolve/main/PHINC.csv?download=true"
-TATOEBA_URL = "https://www.manythings.org/anki/hin-eng.zip"
+TATOEBA_URL = "https://mail.manythings.org/anki/hin-eng.zip"
 
 COMI_NAME = "COMI-LINGUA (Lingo Research Group, IIT Gandhinagar)"
 COMI_LICENSE = "CC BY-SA 4.0 (conservative interpretation; upstream GitHub repository declares CC-BY-SA-4.0)"
@@ -44,7 +44,7 @@ def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_suffix(target.suffix + ".part")
     print(f"Downloading {url}")
-    with requests.get(url, stream=True, timeout=(30, 180)) as response:
+    with requests.get(url, stream=True, timeout=(30, 180), headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36", "Accept": "application/zip,application/octet-stream,*/*"}) as response:
         response.raise_for_status()
         with temp.open("wb") as output:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
