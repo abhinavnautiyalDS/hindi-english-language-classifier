@@ -24,6 +24,7 @@ with st.sidebar:
     min_confidence = st.slider("Minimum confidence", 0.30, 0.95, 0.55, 0.05)
     min_chars = st.slider("Minimum characters", 1, 12, 4)
 
+
 @st.cache_resource
 def get_model(model_path, csv_path):
     if Path(model_path).exists():
@@ -34,6 +35,7 @@ def get_model(model_path, csv_path):
     model.fit(data["text"], data["label"])
     return model, "Fallback demo model (not production-trained)"
 
+
 try:
     model, model_source = get_model(str(MODEL_PATH), data_path)
     detector = LanguageDetector(model, min_confidence=min_confidence, min_chars=min_chars)
@@ -42,7 +44,9 @@ except Exception as exc:
     st.stop()
 
 st.caption(f"Model source: {model_source}")
-single, batch, evaluate, integration = st.tabs(["Single transcript", "Batch CSV", "Held-out evaluation", "Integration"])
+single, batch, evaluate, integration = st.tabs(
+    ["Single transcript", "Batch CSV", "Held-out evaluation", "Integration"]
+)
 
 with single:
     transcript = st.text_area("STT transcript", placeholder="Sir mujhe fees ke baare mein details chahiye")
@@ -70,59 +74,84 @@ with batch:
             df["confidence"] = [p.confidence for p in predictions]
             df["latency_ms"] = [p.latency_ms for p in predictions]
             st.dataframe(df, use_container_width=True)
-            st.download_button("Download predictions", df.to_csv(index=False).encode("utf-8"), "language_predictions.csv", "text/csv")
+            st.download_button(
+                "Download predictions",
+                df.to_csv(index=False).encode("utf-8"),
+                "language_predictions.csv",
+                "text/csv",
+            )
             if "label" in df:
                 valid = df["label"].astype(str).str.lower().isin(LABELS)
                 if valid.any():
-                    st.metric("Accuracy", f"{accuracy_score(df.loc[valid, "label"].str.lower(), df.loc[valid, "predicted_label"]):.1%}")
+                    actual = df.loc[valid, "label"].str.lower()
+                    predicted = df.loc[valid, "predicted_label"]
+                    st.metric("Accuracy", f"{accuracy_score(actual, predicted):.1%}")
 
 with evaluate:
     if EVALUATION_PATH.exists():
         evaluation = json.loads(EVALUATION_PATH.read_text(encoding="utf-8"))
-        st.write(f"Dataset: {evaluation.get("dataset", "Unknown")}")
-        st.write(f"Official held-out test rows: {evaluation.get("test_rows", "Unknown"):,}")
-        st.caption("These corpus metrics are not a substitute for evaluation on consented transcripts from your actual STT engine.")
+        st.write("Dataset:", evaluation.get("dataset", "Unknown"))
+        st.write("Official held-out test rows:", f"{evaluation.get('test_rows', 0):,}")
+        st.caption(
+            "These corpus metrics are not a substitute for evaluation on consented transcripts "
+            "from your actual STT engine."
+        )
         for name, result in evaluation.get("results", {}).items():
-            st.markdown(f"### {name.replace("_", " ").title()}")
+            st.markdown(f"### {name.replace('_', ' ').title()}")
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Accuracy", f"{result.get("accuracy", 0):.2%}")
-            c2.metric("Macro-F1", f"{result.get("macro_f1", 0):.3f}")
-            c3.metric("p50 latency", f"{result.get("latency", {}).get("p50_ms", 0):.3f} ms")
-            c4.metric("p95 latency", f"{result.get("latency", {}).get("p95_ms", 0):.3f} ms")
-            report = result.get("classification_report", {})
-            st.dataframe(pd.DataFrame(report).T, use_container_width=True)
+            c1.metric("Accuracy", f"{result.get('accuracy', 0):.2%}")
+            c2.metric("Macro-F1", f"{result.get('macro_f1', 0):.3f}")
+            c3.metric("p50 latency", f"{result.get('latency', {}).get('p50_ms', 0):.3f} ms")
+            c4.metric("p95 latency", f"{result.get('latency', {}).get('p95_ms', 0):.3f} ms")
+            st.dataframe(pd.DataFrame(result.get("classification_report", {})).T, use_container_width=True)
             matrix = result.get("confusion_matrix")
             if matrix:
                 st.write("Confusion matrix (rows = true; columns = predicted)")
                 st.dataframe(pd.DataFrame(matrix, index=LABELS, columns=LABELS))
-        st.caption(f"Deployment model: {evaluation.get("selected_deployment_model", "unknown")}")
+        st.caption(f"Deployment model: {evaluation.get('selected_deployment_model', 'unknown')}")
     else:
-        st.warning("No corpus evaluation report found. Run python scripts/build_dataset.py and python train.py before interpreting model quality.")
+        st.warning(
+            "No corpus evaluation report found. Run python scripts/build_dataset.py and "
+            "python train.py before interpreting model quality."
+        )
 
     with st.expander("Run a separate quick comparison on a supplied labeled CSV"):
-        st.warning("This uses a random holdout from the selected CSV; it is not the official test result. Do not use the tiny sample file to claim accuracy.")
+        st.warning(
+            "This uses a random holdout from the selected CSV; it is not the official test result. "
+            "Do not use the tiny sample file to claim accuracy."
+        )
         if st.button("Run local CSV comparison"):
             try:
                 data = load_dataset(data_path)
                 if data["label"].value_counts().min() < 2:
                     st.error("Need at least two examples per class.")
                 else:
-                    tr, te = train_test_split(data, test_size=0.30, random_state=42, stratify=data["label"])
+                    tr, te = train_test_split(
+                        data, test_size=0.30, random_state=42, stratify=data["label"]
+                    )
                     summaries = []
-                    for name, builder in [("Logistic Regression", build_logistic_regression), ("Linear SVM", build_linear_svm)]:
+                    for name, builder in [
+                        ("Logistic Regression", build_logistic_regression),
+                        ("Linear SVM", build_linear_svm),
+                    ]:
                         candidate = builder()
                         candidate.fit(tr["text"], tr["label"])
                         pred = candidate.predict(te["text"])
-                        summaries.append({"model": name, "accuracy": accuracy_score(te["label"], pred), "macro_f1": f1_score(te["label"], pred, average="macro", zero_division=0)})
+                        summaries.append({
+                            "model": name,
+                            "accuracy": accuracy_score(te["label"], pred),
+                            "macro_f1": f1_score(te["label"], pred, average="macro", zero_division=0),
+                        })
                     st.dataframe(pd.DataFrame(summaries), use_container_width=True)
             except Exception as exc:
                 st.error(str(exc))
 
 with integration:
-    st.code("""from src.language_classifier import LanguageDetector
-
-detector = LanguageDetector.load("models/language_classifier.joblib")
-result = detector.predict(stt_transcript)
-language_for_llm = previous_language if result.label == "uncertain" else result.label
-""", language="python")
+    st.code(
+        'from src.language_classifier import LanguageDetector\n\n'
+        'detector = LanguageDetector.load("models/language_classifier.joblib")\n'
+        'result = detector.predict(stt_transcript)\n'
+        'language_for_llm = previous_language if result.label == "uncertain" else result.label',
+        language="python",
+    )
     st.info("Measure classifier latency separately from STT and end-to-end call latency.")
