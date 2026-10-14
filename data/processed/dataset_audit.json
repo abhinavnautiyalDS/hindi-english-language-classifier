@@ -1,0 +1,141 @@
+{
+  "dataset": "COMI-LINGUA + PHINC + Tatoeba English-Hindi",
+  "source_url": "https://github.com/lingo-iitgn/COMI-LINGUA",
+  "sources": [
+    {
+      "name": "COMI-LINGUA (Lingo Research Group, IIT Gandhinagar)",
+      "url": "https://github.com/lingo-iitgn/COMI-LINGUA",
+      "license": "CC BY-SA 4.0 (conservative interpretation; upstream GitHub repository declares CC-BY-SA-4.0)",
+      "use": "official LID train/test splits; majority vote over human annotator tags"
+    },
+    {
+      "name": "PHINC (Parallel Hinglish Social Media Code-Mixed Corpus)",
+      "url": "https://huggingface.co/datasets/LingoIITGN/PHINC",
+      "license": "CC BY 4.0",
+      "use": "Romanized Hinglish source text and human English translations; paired rows split together"
+    },
+    {
+      "name": "Tatoeba English-Hindi sentence pairs (ManyThings.org selection)",
+      "url": "https://www.manythings.org/anki/hin-eng.zip",
+      "license": "CC BY 2.0 France",
+      "use": "monolingual Hindi and English examples; paired rows split together; attribution retained in DATASET_ATTRIBUTION_TATOEBA.tsv"
+    }
+  ],
+  "license": "COMI-LINGUA conservatively treated as CC BY-SA 4.0; PHINC CC BY 4.0; Tatoeba CC BY 2.0 France. See DATASET_CARD.md and attribution file.",
+  "label_rule": "COMI per-annotator: hi ratio >= 80% => hindi; en ratio >= 80% => english; otherwise hinglish; majority vote across human annotators; PHINC source => hinglish and translation => english; Tatoeba pair => hindi/english",
+  "cleaning": [
+    "Unicode NFKC normalization",
+    "remove zero-width/BOM characters and collapse whitespace",
+    "majority vote across human COMI-LINGUA annotators; discard ties",
+    "drop empty/very short text",
+    "deduplicate exact case-insensitive text within each combined split",
+    "split PHINC and Tatoeba by paired row before expanding labels",
+    "remove exact train/test text overlap across all sources"
+  ],
+  "comi_splits": {
+    "train": {
+      "input_rows": 30487,
+      "rows_with_usable_majority_labels": 20870,
+      "rows_after_exact_casefold_deduplication": 20869,
+      "dropped_rows": 9618,
+      "label_counts": {
+        "hindi": 9171,
+        "english": 88,
+        "hinglish": 11610
+      },
+      "text_column": "Sentences",
+      "tag_columns": [
+        "Annotated by: Annotator 1",
+        "Annotated by: Annotator 2",
+        "Annotated by: Annotator 3"
+      ],
+      "annotation_method": "majority vote across human annotators"
+    },
+    "test": {
+      "input_rows": 5000,
+      "rows_with_usable_majority_labels": 5000,
+      "rows_after_exact_casefold_deduplication": 5000,
+      "dropped_rows": 0,
+      "label_counts": {
+        "hindi": 1492,
+        "english": 15,
+        "hinglish": 3493
+      },
+      "text_column": "Sentences",
+      "tag_columns": [
+        "Annotated by: Annotator 1",
+        "Annotated by: Annotator 2",
+        "Annotated by: Annotator 3"
+      ],
+      "annotation_method": "majority vote across human annotators"
+    }
+  },
+  "phinc": {
+    "dataset": "PHINC (Parallel Hinglish Social Media Code-Mixed Corpus)",
+    "source_url": "https://huggingface.co/datasets/LingoIITGN/PHINC",
+    "license": "CC BY 4.0",
+    "input_rows": 13738,
+    "clean_unique_pairs": 13533,
+    "text_column": "Sentence",
+    "english_translation_column": "English_Translation",
+    "split_rule": "deterministic 80/20 split by paired row; both members of each translation pair stay in the same split",
+    "label_counts": {
+      "train": {
+        "hindi": 0,
+        "english": 10826,
+        "hinglish": 10826
+      },
+      "test": {
+        "hindi": 0,
+        "english": 2707,
+        "hinglish": 2707
+      }
+    }
+  },
+  "tatoeba": {
+    "dataset": "Tatoeba English-Hindi sentence pairs (ManyThings.org selection)",
+    "source_url": "https://www.manythings.org/anki/hin-eng.zip",
+    "license": "CC BY 2.0 France",
+    "source_file": "hin.txt",
+    "clean_unique_pairs": 3116,
+    "split_rule": "deterministic 80/20 split by paired row; English and Hindi sentence pair stay in same split",
+    "attribution_file": "DATASET_ATTRIBUTION_TATOEBA.tsv",
+    "label_counts": {
+      "train": {
+        "hindi": 2493,
+        "english": 2493,
+        "hinglish": 0
+      },
+      "test": {
+        "hindi": 623,
+        "english": 623,
+        "hinglish": 0
+      }
+    }
+  },
+  "train_test_overlap_removed": 4955,
+  "final_label_counts": {
+    "train": {
+      "hindi": 9867,
+      "english": 12883,
+      "hinglish": 16504
+    },
+    "test": {
+      "hindi": 2114,
+      "english": 3273,
+      "hinglish": 6116
+    }
+  },
+  "final_source_counts": {
+    "train": {
+      "COMI-LINGUA": 16085,
+      "PHINC": 18504,
+      "Tatoeba": 4665
+    },
+    "test": {
+      "COMI-LINGUA": 5000,
+      "PHINC": 5271,
+      "Tatoeba": 1232
+    }
+  }
+}
