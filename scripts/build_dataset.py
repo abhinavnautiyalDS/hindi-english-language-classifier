@@ -12,9 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / "data" / "raw"
 PROCESSED_DIR = ROOT / "data" / "processed"
 LABELS = ("hindi", "english", "hinglish")
+PURE_LANGUAGE_THRESHOLD = 0.80
 
-# COMI-LINGUA: expert-reviewed Hindi-English code-mixing annotations.
-# Use the upstream CSVs and retain their official train/test split.
 SOURCE_FILES = {
     "train": "https://huggingface.co/datasets/LingoIITGN/COMI-LINGUA/resolve/main/LID_train.csv?download=true",
     "test": "https://huggingface.co/datasets/LingoIITGN/COMI-LINGUA/resolve/main/LID_test.csv?download=true",
@@ -44,8 +43,7 @@ def download(url: str, target: Path) -> None:
 def normalize_text(value: object) -> str:
     text = unicodedata.normalize("NFKC", str(value or ""))
     text = text.replace("\u200b", "").replace("\ufeff", "")
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def choose_columns(frame: pd.DataFrame) -> tuple[str, str]:
@@ -64,25 +62,27 @@ def choose_columns(frame: pd.DataFrame) -> tuple[str, str]:
             "Could not identify sentence and token-language-tag columns. "
             f"Found columns: {list(frame.columns)}"
         )
-    # Prefer the most explicit header names when there are several candidates.
     text_col = sorted(text_candidates, key=lambda c: (("sentence" not in normalized[c]), len(normalized[c])))[0]
     tag_col = sorted(tag_candidates, key=lambda c: (("lid" not in normalized[c] and "tag" not in normalized[c]), len(normalized[c])))[0]
     return text_col, tag_col
 
 
 def sentence_label(tags_value: object) -> str | None:
-    # LID tags are token-level values such as "hi hi en en ot".
-    # Ignore punctuation/other tokens; classify mixed sentences as Hinglish.
+    # COMI-LINGUA labels words with hi/en/other tags. A dominant-language
+    # threshold keeps short English loanwords from forcing every sentence to Hinglish.
     tags = re.findall(r"(?<![a-z])(hi|en|ot|other)(?![a-z])", str(tags_value).lower())
-    has_hi = "hi" in tags
-    has_en = "en" in tags
-    if has_hi and has_en:
-        return "hinglish"
-    if has_hi:
+    hi_count = tags.count("hi")
+    en_count = tags.count("en")
+    total = hi_count + en_count
+    if total == 0:
+        return None
+    hi_ratio = hi_count / total
+    en_ratio = en_count / total
+    if hi_ratio >= PURE_LANGUAGE_THRESHOLD:
         return "hindi"
-    if has_en:
+    if en_ratio >= PURE_LANGUAGE_THRESHOLD:
         return "english"
-    return None
+    return "hinglish"
 
 
 def convert_split(split: str, raw_path: Path) -> tuple[pd.DataFrame, dict]:
@@ -122,7 +122,7 @@ def main() -> None:
         "dataset": SOURCE_NAME,
         "source_url": SOURCE_URL,
         "license": SOURCE_LICENSE,
-        "label_rule": "hi+en tags => hinglish; hi only => hindi; en only => english; ot/other ignored",
+        "label_rule": f"hi ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => hindi; en ratio >= {PURE_LANGUAGE_THRESHOLD:.0%} => english; otherwise hinglish; ot/other ignored",
         "cleaning": [
             "Unicode NFKC normalization",
             "remove zero-width/BOM characters",
@@ -140,7 +140,6 @@ def main() -> None:
         download(url, raw_path)
         frames[split], audit["splits"][split] = convert_split(split, raw_path)
 
-    # Keep official test examples completely out of training, even if upstream duplicates exist.
     test_keys = set(frames["test"]["text"].str.casefold())
     before = len(frames["train"])
     frames["train"] = frames["train"][
