@@ -40,7 +40,7 @@ These labels are not all natively provided by the source datasets. The exact rul
 
 The pipeline applies Unicode NFKC normalization, removes zero-width/BOM characters, collapses whitespace, drops empty/very short examples, deduplicates case-insensitive exact text within splits, splits PHINC and Tatoeba by translation pair, and removes exact text overlap between the combined train/test sets. The COMI-LINGUA held-out split is retained.
 
-Raw and processed corpus files are not committed. The training workflow downloads and cleans the data when it runs. The Tatoeba attribution file is retained in the repository to preserve source attribution.
+The cleaned, labeled `data/processed/train.csv` and `data/processed/test.csv` datasets, plus `data/processed/dataset_audit.json`, are committed to the repository for inspection and reproducibility. Raw source downloads remain excluded from Git and are downloaded by the build pipeline. The Tatoeba attribution file is retained in the repository to preserve source attribution.
 
 ## Important limitations
 
