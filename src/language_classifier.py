@@ -17,7 +17,7 @@ DEFAULT_MODEL_PATH = Path("models/language_classifier.joblib")
 
 def normalize_text(text: str) -> str:
     """Conservative normalization: preserve script and spelling cues."""
-    return re.sub(r"\\s+", " ", str(text or "").strip().lower())
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
 
 
 def build_logistic_regression() -> Pipeline:
