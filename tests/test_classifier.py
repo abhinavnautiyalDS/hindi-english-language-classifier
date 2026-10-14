@@ -2,7 +2,7 @@ from src.language_classifier import normalize_text, build_logistic_regression
 
 
 def test_normalize_text():
-    assert normalize_text("  HELLO\\n  THERE ") == "hello there"
+    assert normalize_text("  HELLO\n  THERE ") == "hello there"
 
 
 def test_model_fits_and_predicts():
