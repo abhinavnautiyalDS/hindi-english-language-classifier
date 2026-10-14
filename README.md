@@ -2,14 +2,15 @@
 
 Low-latency sentence-level classification for Hindi, English, and Hinglish text, designed for transcripts produced by Indian voice-agent STT systems.
 
-## Train on real annotated data
+## Train on curated public data
 
-The data pipeline combines two public research corpora:
+The training pipeline combines three datasets:
 
-1. **COMI-LINGUA** from the Lingo Research Group at IIT Gandhinagar. The pipeline uses its LID train/test splits and majority voting across human annotator tag sequences.
-2. **PHINC**, a 13,738-pair corpus of Romanized Hinglish social-media text and human English translations. Paired sentences are kept together when creating its train/test split.
+1. **COMI-LINGUA** from the Lingo Research Group at IIT Gandhinagar. Human annotator tags are preferred over predicted tags.
+2. **PHINC**, a 13,738-pair corpus of Romanized Hinglish social-media text and human English translations.
+3. **Tatoeba English-Hindi sentence pairs**, distributed by ManyThings.org, to strengthen the monolingual Hindi and English classes. Attribution metadata is retained in DATASET_ATTRIBUTION_TATOEBA.tsv.
 
-The pipeline downloads the source files, cleans text, derives sentence labels, removes exact train/test overlap, compares Logistic Regression with Linear SVM, and saves evaluation metrics.
+The pipeline downloads source files, cleans text, derives sentence labels, keeps translation pairs together during splitting, removes exact train/test overlap, compares Logistic Regression with Linear SVM, and saves evaluation metrics.
 
 ```bash
 python -m venv .venv
@@ -22,21 +23,23 @@ python train.py
 streamlit run app.py
 ```
 
-The raw and processed corpora are not committed to Git. They are downloaded during the data build step and ignored by Git. The generated audit records row counts, class balance, source provenance, and cleaning decisions.
+Raw and processed datasets are not committed. They are downloaded during the data build step and ignored by Git. The generated audit records row counts, class balance, provenance, and cleaning decisions.
 
-## Dataset and labels
+## Label design
 
-See [DATASET_CARD.md](DATASET_CARD.md) for source citations, licensing, label construction, and limitations.
+See [DATASET_CARD.md](DATASET_CARD.md) for full source details, citations, license notes, and limitations.
 
-- COMI-LINGUA tags are token-level. For each human annotator, Hindi token ratio >= 80% maps to `hindi`, English token ratio >= 80% maps to `english`, and the rest maps to `hinglish`. A majority vote across annotators determines the final label; ties are discarded.
+- COMI-LINGUA tags are token-level. For each annotator, Hindi token ratio >= 80% maps to `hindi`, English token ratio >= 80% maps to `english`, and the rest maps to `hinglish`. Majority vote determines the label; ties are discarded.
 - PHINC Hinglish source sentences map to `hinglish`; their human English translations map to `english`.
-- The class labels are project-defined sentence-level labels; COMI-LINGUA itself is not released with these exact sentence-level classes.
+- Tatoeba Hindi and English sentences map to `hindi` and `english`, respectively.
+
+These are project-defined sentence-level labels, not a label schema natively supplied by every source.
 
 ## Evaluation
 
-`models/evaluation.json` includes accuracy, macro-F1, per-class precision/recall/F1, confusion matrices, training time, and p50/p95 single-transcript classifier latency. Evaluation combines the held-out COMI-LINGUA split with a held-out PHINC subset split by translation pair, after removing exact train/test text overlap.
+`models/evaluation.json` includes accuracy, macro-F1, per-class precision/recall/F1, confusion matrices, training time, and p50/p95 single-transcript classifier latency. Evaluation combines the held-out COMI-LINGUA split with held-out PHINC and Tatoeba subsets split by paired row, after removing exact train/test text overlap.
 
-**These are text-corpus metrics, not production validation.** PHINC contains social-media Hinglish and COMI-LINGUA contains code-mixed text; neither guarantees coverage of the exact STT engine, spoken-call conditions, regional accents, short acknowledgements, interruptions, or ASR substitutions. Before production, evaluate on consented, anonymized, speaker-separated transcripts from the target STT pipeline and keep that test set separate from training.
+**These are text-corpus metrics, not production validation.** These corpora do not guarantee coverage of the exact STT engine, spoken-call conditions, regional accents, short acknowledgements, interruptions, or ASR substitutions. Before production, evaluate on consented, anonymized, speaker-separated transcripts from the target STT pipeline and keep that test set separate from training.
 
 ## Run the API
 
@@ -51,11 +54,12 @@ uvicorn api:app --host 0.0.0.0 --port 8000
 
 ## Streamlit deployment
 
-Choose this repository, branch `main`, and entrypoint `app.py` in Streamlit Community Cloud. The trained model and evaluation report are generated by the GitHub Actions workflow.
+Choose this repository, branch `main`, and entrypoint `app.py` in Streamlit Community Cloud. The trained model and evaluation report are generated by GitHub Actions.
 
-## Citations and source licenses
+## Citations and licenses
 
 - Sheth, Rajvee; Beniwal, Himanshu; Singh, Mayank (2025). “COMI-LINGUA: Expert Annotated Large-Scale Dataset for Multitask NLP in Hindi-English Code-Mixing.” Findings of EMNLP 2025. https://aclanthology.org/2025.findings-emnlp.422/
 - Srivastava, Vivek; Singh, Mayank (2020). “PHINC: A Parallel Hinglish Social Media Code-Mixed Corpus for Machine Translation.” W-NUT 2020. https://aclanthology.org/2020.wnut-1.7/
+- Tatoeba English-Hindi sentence pairs, distributed by ManyThings.org under CC BY 2.0 France: https://mail.manythings.org/anki/hin-eng.zip
 
-Upstream datasets: https://github.com/lingo-iitgn/COMI-LINGUA and https://huggingface.co/datasets/LingoIITGN/PHINC
+Upstream sources: https://github.com/lingo-iitgn/COMI-LINGUA, https://huggingface.co/datasets/LingoIITGN/PHINC, and https://tatoeba.org/
