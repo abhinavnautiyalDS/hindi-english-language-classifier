@@ -5,4 +5,3 @@ __pycache__/
 .streamlit/secrets.toml
 data/private/
 data/raw/
-data/processed/
