@@ -23,7 +23,7 @@ python train.py
 streamlit run app.py
 ```
 
-Raw and processed datasets are not committed. They are downloaded during the data build step and ignored by Git. The generated audit records row counts, class balance, provenance, and cleaning decisions.
+The cleaned, labeled datasets are committed at [`data/processed/train.csv`](data/processed/train.csv) and [`data/processed/test.csv`](data/processed/test.csv), with provenance and cleaning counts in [`data/processed/dataset_audit.json`](data/processed/dataset_audit.json). Raw upstream downloads remain excluded from Git; the build script downloads them when rebuilding the corpus. GitHub Actions refreshes the processed files when the training workflow runs.
 
 ## Label design
 
