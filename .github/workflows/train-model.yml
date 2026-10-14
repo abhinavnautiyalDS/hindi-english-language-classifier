@@ -41,15 +41,15 @@ jobs:
         run: python -m pytest -q
       - name: Train and evaluate models
         run: python train.py
-      - name: Commit trained model, evaluation, and source attribution
+      - name: Commit processed datasets, trained model, evaluation, and source attribution
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add models/language_classifier.joblib models/evaluation.json DATASET_ATTRIBUTION_TATOEBA.tsv
+          git add models/language_classifier.joblib models/evaluation.json DATASET_ATTRIBUTION_TATOEBA.tsv data/processed/train.csv data/processed/test.csv data/processed/dataset_audit.json
           if git diff --cached --quiet; then
-            echo "No model or attribution changes to commit."
+            echo "No dataset, model, evaluation, or attribution changes to commit."
           else
-            git commit -m "Train classifier on curated Hindi-English corpora"
+            git commit -m "Publish curated Hindi-English datasets and trained classifier"
             git fetch origin main
             git rebase origin/main
             git push origin HEAD:main
