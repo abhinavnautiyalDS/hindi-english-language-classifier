@@ -6,6 +6,7 @@ on:
     paths:
       - "data/sample.csv"
       - "src/**"
+      - "tests/**"
       - "train.py"
       - "requirements.txt"
       - ".github/workflows/train-model.yml"
