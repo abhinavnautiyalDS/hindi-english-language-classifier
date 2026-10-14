@@ -4,16 +4,17 @@ on:
   push:
     branches: [main]
     paths:
-      - "data/sample.csv"
       - "src/**"
       - "scripts/**"
       - "tests/**"
       - "train.py"
       - "requirements.txt"
-      - "DATASET_CARD.md"
-      - ".gitignore"
       - ".github/workflows/train-model.yml"
   workflow_dispatch:
+
+concurrency:
+  group: classifier-training-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -40,15 +41,15 @@ jobs:
         run: python -m pytest -q
       - name: Train and evaluate models
         run: python train.py
-      - name: Commit trained model and evaluation
+      - name: Commit trained model, evaluation, and source attribution
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add models/language_classifier.joblib models/evaluation.json
+          git add models/language_classifier.joblib models/evaluation.json DATASET_ATTRIBUTION_TATOEBA.tsv
           if git diff --cached --quiet; then
-            echo "No model changes to commit."
+            echo "No model or attribution changes to commit."
           else
-            git commit -m "Train classifier on cleaned COMI-LINGUA corpus"
+            git commit -m "Train classifier on curated Hindi-English corpora"
             git fetch origin main
             git rebase origin/main
             git push origin HEAD:main
