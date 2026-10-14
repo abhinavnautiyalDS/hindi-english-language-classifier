@@ -114,7 +114,7 @@ def main():
         "source_url": dataset_audit.get("source_url"),
         "sources": dataset_audit.get("sources", []),
         "license": dataset_audit.get("license"),
-        "evaluation_split": "COMI-LINGUA held-out split plus a paired-row PHINC holdout; exact train/test text overlap removed",
+        "evaluation_split": "COMI-LINGUA held-out split plus paired-row PHINC and Tatoeba holdouts; exact train/test text overlap removed",
         "selected_deployment_model": deploy_name,
         "best_model_by_test_macro_f1": max(results, key=lambda key: results[key]["macro_f1"]),
         "labels": list(LABELS),
