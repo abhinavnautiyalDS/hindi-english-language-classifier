@@ -1,5 +1,6 @@
 from __future__ import annotations
 import argparse, json
+import pandas as pd
 from pathlib import Path
 import joblib
 from src.binary_training import binary_corpus, evaluate_candidates, normalize_binary_frame, with_other_rejection

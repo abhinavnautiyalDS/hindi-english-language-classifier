@@ -17,7 +17,7 @@ OUTPUT_LABELS = ("english", "hinglish", "other", "uncertain")
 # Common Romanized Hindi cues. This is an explicit heuristic layer for short
 # turns; expand it using reviewed call examples rather than auto-labeling them.
 ROMANIZED_HINDI_CUES = set("""
-hai hain ho hun hoga hogi honge tha thi the mujhe mera meri mere aap apko aapko
+hai hain ho hun hoga hogi honge tha thi mujhe mera meri mere aap apko aapko
 aapka aapki tum tumhe tu kya kaise kaisa kaunsi kaun kab kahan kaha kyun kyu kyon
 nahi nahin na nhi haan han ji jii achha acha accha thik theek kr do karo karna
 chahiye chahte chahta bata batao bataiye bataye bol raha rahi abhi kal aaj par
@@ -76,11 +76,15 @@ class OtherLanguageRejector:
         if has_other_non_latin and has_latin:
             return "other", None
         tokens = re.findall(r"[a-z]+(?:'[a-z]+)?", cleaned.lower())
+        if cleaned.lower() in {"okay sir", "ok sir", "yes sir", "no sir"}:
+            return "uncertain", None
         if len(tokens) == 1 and tokens[0] in SINGLE_WORD_UNCERTAIN:
             return "uncertain", None
         if romanized_hindi_cue(cleaned):
             return "hinglish", None
         if not has_latin:
+            return "uncertain", None
+        if len(tokens) < 2 or sum(ch.isalpha() for ch in cleaned) < 5:
             return "uncertain", None
         score = float(np.asarray(self.model.decision_function([cleaned])).reshape(-1)[0])
         if abs(score) < self.min_margin:

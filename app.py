@@ -41,6 +41,8 @@ with tabs[0]:
             b.metric("Latency", f"{ms:.3f} ms")
             if hasattr(model, "predict_proba"):
                 st.bar_chart(pd.Series(dict(zip(model.classes_, model.predict_proba([utterance])[0]))))
+            if pred == "uncertain":
+                st.info("Ambiguous/neutral utterance: preserve current language; do not switch on a single word.")
             if pred == "other":
                 st.info("This utterance was rejected as unsupported/uncertain. It is not being forced into English or Hinglish.")
     upload = st.file_uploader("Batch prediction CSV (text column)", type=["csv"], key="batch")
@@ -67,8 +69,8 @@ with tabs[1]:
             if "label" not in df:
                 df["label"] = ""
             edited = st.data_editor(df, use_container_width=True, num_rows="dynamic",
-                column_config={"label": st.column_config.SelectboxColumn("Verified label", options=["", "english", "hinglish", "other"], required=False)})
-            st.metric("Verified rows", int(edited["label"].isin(["english", "hinglish", "other"]).sum()))
+                column_config={"label": st.column_config.SelectboxColumn("Verified label", options=["", "english", "hinglish", "uncertain", "other"], required=False)})
+            st.metric("Verified rows", int(edited["label"].isin(["english", "hinglish", "uncertain", "other"]).sum()))
             st.download_button("Download reviewed labels", edited.to_csv(index=False).encode(), "verified_call_labels.csv", "text/csv")
 
 with tabs[2]:

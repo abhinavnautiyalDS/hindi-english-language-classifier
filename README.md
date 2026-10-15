@@ -5,8 +5,11 @@ Lightweight CPU classifier for finalized voice-agent STT utterances. The binary 
 ## Important behavior
 
 The trained text model is binary: `english` and `hinglish`. A rejection wrapper adds `other`:
-- Utterances containing letters from a non-Latin script (for example Telugu or Devanagari/Hindi) return `other`.
-- Latin-script utterances whose LinearSVC decision margin is below 0.35 return `other`.
+- Devanagari text (pure Hindi or mixed Hindi-English) returns `hinglish` per product policy.
+- Romanized Hindi cues return `hinglish`.
+- One-word greetings such as `hello`, `bye`, `thanks`, `okay` return `uncertain`; preserve current response language.
+- Unsupported non-Latin scripts such as Telugu-only text return `other`.
+- Low-margin Latin-script predictions return `uncertain`, not `other`.
 - Other confident Latin-script text can still be confused with English/Hinglish. This is not universal language identification; add manually labelled examples from the actual languages you need to reject and evaluate them separately.
 
 **Do not interpret OTHER as Hindi.** Your voice-agent orchestration should handle it explicitly (for example, ask the caller to repeat in English/Hinglish or route to a multilingual path) rather than silently changing it to Hindi.
