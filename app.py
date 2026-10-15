@@ -12,9 +12,9 @@ LEGACY_MODEL, LEGACY_EVAL = ROOT/"models/language_classifier.joblib", ROOT/"mode
 MODEL_PATH = ROOT/"models/english_hinglish_classifier.joblib"
 st.set_page_config(page_title="English · Hinglish Classifier Lab", page_icon="🗣️", layout="wide")
 st.title("English · Hinglish Classifier Lab")
-st.caption("English/Hinglish classification with an OTHER rejection outcome for unsupported languages and uncertain text.")
+st.caption("English/Hinglish classification with OTHER and UNCERTAIN outcomes for unsupported languages and ambiguous short turns.")
 with st.sidebar:
-    st.info("Outputs: ENGLISH, HINGLISH, or OTHER. Hindi/Telugu and other non-Latin scripts are rejected as OTHER.")
+    st.info("Outputs: ENGLISH, HINGLISH, OTHER, or UNCERTAIN. Devanagari (pure Hindi or mixed-script) routes to HINGLISH; other scripts route to OTHER; one-word greetings like hello/bye route to UNCERTAIN.")
     st.write("Model selection: macro-F1 → p95 latency → model size.")
     st.caption("96% is a target, not a guarantee.")
 tabs = st.tabs(["Predict", "Label call data", "Train & compare", "Existing baseline", "Integration"])
@@ -134,5 +134,5 @@ with tabs[3]:
         st.info("No legacy evaluation report found.")
 
 with tabs[4]:
-    st.code('import joblib\nmodel = joblib.load("models/english_hinglish_classifier.joblib")\nlabel = model.predict([finalized_stt_utterance])[0]  # english | hinglish | other\n# Update language state before LLM/TTS; OTHER must not be converted to Hindi.', language="python")
+    st.code('import joblib\nmodel = joblib.load("models/english_hinglish_classifier.joblib")\nlabel = model.predict([finalized_stt_utterance])[0]  # english | hinglish | other | uncertain\n# Update language state before LLM/TTS. For uncertain, preserve current language or clarify.', language="python")
     st.info("Log STT-final, classifier start/end, LLM start/end and TTS start/end separately. Validate OTHER rejection on manually labelled multilingual call turns.")

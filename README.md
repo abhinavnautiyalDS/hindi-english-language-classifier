@@ -1,6 +1,6 @@
 # English / Hinglish Language Classifier
 
-Lightweight CPU classifier for finalized voice-agent STT utterances. The binary model distinguishes English from Hinglish and has an explicit **OTHER** rejection outcome so unsupported inputs are not always forced into one of the two classes.
+Lightweight CPU classifier for finalized voice-agent STT utterances. The binary model distinguishes English from Hinglish and has explicit **OTHER** and **UNCERTAIN** outcomes so unsupported inputs are not always forced into one of the two classes.
 
 ## Important behavior
 
@@ -46,10 +46,10 @@ Load `models/english_hinglish_classifier.joblib` and classify each **finalized c
 ```python
 import joblib
 model = joblib.load("models/english_hinglish_classifier.joblib")
-label = model.predict([finalized_stt_utterance])[0]  # english | hinglish | other
+label = model.predict([finalized_stt_utterance])[0]  # english | hinglish | other | uncertain
 ```
 
-Update language state per turn, not only at call start. For `other`, do not map to Hindi or Hinglish; follow a deliberate fallback. Log STT-final, classifier start/end, LLM start/end and TTS start/end to separate classifier errors from orchestration lag and network latency.
+Update language state per turn, not only at call start. For `other`, use an unsupported-language fallback. For `uncertain`, preserve the current voice-agent language or ask for clarification; do not switch on a one-word acknowledgement. Log STT-final, classifier start/end, LLM start/end and TTS start/end to separate classifier errors from orchestration lag and network latency.
 
 ## Data sources
 
