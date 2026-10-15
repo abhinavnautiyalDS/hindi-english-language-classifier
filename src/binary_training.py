@@ -1,5 +1,5 @@
 from __future__ import annotations
-import io, re, time
+import io, re, time, unicodedata
 from pathlib import Path
 import joblib
 import numpy as np
@@ -15,9 +15,16 @@ LABELS = ("english", "hinglish")
 OUTPUT_LABELS = ("english", "hinglish", "other")
 
 
-def contains_non_latin_letters(text: str) -> bool:
-    """Reject utterances containing letters from non-Latin scripts (Hindi, Telugu, etc.)."""
-    return any(ch.isalpha() and "LATIN" not in __import__("unicodedata").name(ch, "") for ch in str(text))
+def script_profile(text: str) -> tuple[bool, bool]:
+    """Return (has_non_latin_letters, has_latin_letters)."""
+    has_non_latin = has_latin = False
+    for ch in str(text or ""):
+        if ch.isalpha():
+            if "LATIN" in unicodedata.name(ch, ""):
+                has_latin = True
+            else:
+                has_non_latin = True
+    return has_non_latin, has_latin
 
 
 class OtherLanguageRejector:
@@ -36,8 +43,12 @@ class OtherLanguageRejector:
         outputs = []
         for text in texts:
             cleaned = str(text or "").strip()
-            if not cleaned or contains_non_latin_letters(cleaned):
+            has_non_latin, has_latin = script_profile(cleaned)
+            if not cleaned or (has_non_latin and not has_latin):
                 outputs.append("other")
+                continue
+            if has_non_latin and has_latin:
+                outputs.append("hinglish")
                 continue
             score = float(np.asarray(self.model.decision_function([cleaned])).reshape(-1)[0])
             if abs(score) < self.min_margin:
@@ -52,8 +63,12 @@ class OtherLanguageRejector:
         rows = []
         for text in texts:
             cleaned = str(text or "").strip()
-            if not cleaned or contains_non_latin_letters(cleaned):
+            has_non_latin, has_latin = script_profile(cleaned)
+            if not cleaned or (has_non_latin and not has_latin):
                 rows.append([0.0, 0.0, 1.0])
+                continue
+            if has_non_latin and has_latin:
+                rows.append([0.0, 1.0, 0.0])
                 continue
             score = float(np.asarray(self.model.decision_function([cleaned])).reshape(-1)[0])
             strength = 1.0 / (1.0 + np.exp(-min(abs(score), 30.0)))

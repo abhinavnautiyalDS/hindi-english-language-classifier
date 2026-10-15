@@ -32,6 +32,8 @@ python scripts/build_dataset.py
 python -m pytest -q
 python train.py
 python train_binary.py
+# Add manually verified call labels without replacing original datasets:
+python train_binary.py --call-data /path/to/verified_call_data.csv
 ```
 
 The binary training script compares Logistic Regression, Linear SVM, SGD Log Loss and Complement Naive Bayes, then persists the top candidate behind the OTHER rejection wrapper. Corpus metrics cover English/Hinglish examples only; they do not measure OTHER detection.

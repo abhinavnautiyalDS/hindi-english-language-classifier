@@ -1,8 +1,8 @@
 from __future__ import annotations
-import json
+import argparse, json
 from pathlib import Path
 import joblib
-from src.binary_training import binary_corpus, evaluate_candidates, with_other_rejection
+from src.binary_training import binary_corpus, evaluate_candidates, normalize_binary_frame, with_other_rejection
 
 ROOT = Path(__file__).resolve().parent
 TRAIN_PATH = ROOT / "data/processed/train.csv"
@@ -12,12 +12,26 @@ REPORT_PATH = ROOT / "models/binary_evaluation.json"
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--call-data", default=None, help="CSV with manually verified text,label columns")
+    args = parser.parse_args()
     if not TRAIN_PATH.exists() or not TEST_PATH.exists():
         raise SystemExit("Processed datasets are missing; run scripts/build_dataset.py first.")
     train = binary_corpus(TRAIN_PATH)
     test = binary_corpus(TEST_PATH)
     test_texts = set(test["text"].str.casefold())
     train = train[~train["text"].str.casefold().isin(test_texts)].drop_duplicates("text").reset_index(drop=True)
+    call_rows_added = 0
+    if args.call_data:
+        calls = pd.read_csv(args.call_data)
+        if not {"text", "label"}.issubset(calls.columns):
+            raise SystemExit("Call CSV must contain text,label with manually verified english/hinglish labels.")
+        calls["label"] = calls["label"].fillna("").astype(str).str.strip().str.lower()
+        calls = normalize_binary_frame(calls[calls["label"].isin(["english", "hinglish"])].copy())
+        calls = calls[~calls["text"].str.casefold().isin(test_texts)]
+        call_rows_added = len(calls)
+        train = pd.concat([train, calls], ignore_index=True).drop_duplicates("text", keep="last").reset_index(drop=True)
+    print(f"Manually verified call rows added: {call_rows_added:,}")
     print(f"Binary training rows: {len(train):,}")
     print(f"Binary held-out corpus rows: {len(test):,}")
     print("Train labels:", train["label"].value_counts().to_dict())
@@ -38,6 +52,8 @@ def main():
         "evaluation_note": "Binary corpus metrics evaluate English/Hinglish only. OTHER rejection needs separate multilingual, manually labelled validation before production claims.",
         "selected_model": selected,
         "train_rows": len(train),
+        "verified_call_rows_added": call_rows_added,
+        "original_dataset_sources": ["COMI-LINGUA", "PHINC", "Tatoeba"],
         "test_rows": len(test),
         "train_label_counts": train["label"].value_counts().to_dict(),
         "test_label_counts": test["label"].value_counts().to_dict(),
