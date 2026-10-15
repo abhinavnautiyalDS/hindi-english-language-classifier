@@ -113,3 +113,83 @@ class OtherLanguageRejector:
 def with_other_rejection(model, min_margin: float = 0.35):
     return OtherLanguageRejector(model, min_margin=min_margin)
 
+
+
+def normalize_binary_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    """Normalize a text/label frame and retain only binary training labels."""
+    if not {"text", "label"}.issubset(frame.columns):
+        raise ValueError("Dataset must contain text and label columns.")
+    out = frame[["text", "label"]].copy()
+    out["text"] = out["text"].fillna("").astype(str).str.strip()
+    out["label"] = out["label"].fillna("").astype(str).str.lower().str.strip()
+    out = out[out["label"].isin(LABELS) & out["text"].ne("")]
+    out = out.drop_duplicates(subset=["text"], keep="first").reset_index(drop=True)
+    return out
+
+
+def binary_corpus(path) -> pd.DataFrame:
+    """Load a repository dataset and keep only English/Hinglish rows."""
+    frame = pd.read_csv(path)
+    return normalize_binary_frame(frame)
+
+
+def _candidate_models():
+    word = TfidfVectorizer(
+        analyzer="word", ngram_range=(1, 2), min_df=2,
+        max_features=180000, sublinear_tf=True, strip_accents="unicode",
+    )
+    char = TfidfVectorizer(
+        analyzer="char_wb", ngram_range=(2, 5), min_df=2,
+        max_features=220000, sublinear_tf=True,
+    )
+    features = FeatureUnion([("word", word), ("char", char)])
+    return {
+        "LinearSVC": Pipeline([("tfidf", features), ("clf", LinearSVC(C=1.0, class_weight="balanced"))]),
+        "LogisticRegression": Pipeline([("tfidf", features), ("clf", LogisticRegression(max_iter=1500, class_weight="balanced", C=4.0))]),
+        "SGDClassifier": Pipeline([("tfidf", features), ("clf", SGDClassifier(loss="log_loss", max_iter=1500, tol=1e-3, class_weight="balanced", random_state=42))]),
+        "ComplementNB": Pipeline([("tfidf", features), ("clf", ComplementNB(alpha=0.2))]),
+    }
+
+
+def evaluate_candidates(train: pd.DataFrame, test: pd.DataFrame):
+    """Fit candidate pipelines and evaluate on the fixed held-out corpus split."""
+    train = normalize_binary_frame(train)
+    test = normalize_binary_frame(test)
+    if train.empty or test.empty or train["label"].nunique() != 2 or test["label"].nunique() != 2:
+        raise ValueError("Training and test data must each contain both english and hinglish labels.")
+    X_train, y_train = train["text"].tolist(), train["label"].tolist()
+    X_test, y_test = test["text"].tolist(), test["label"].tolist()
+    results, models = {}, {}
+    for name, model in _candidate_models().items():
+        started = time.perf_counter()
+        model.fit(X_train, y_train)
+        train_seconds = time.perf_counter() - started
+        pred = model.predict(X_test)
+        latencies = []
+        for sample in X_test[: min(500, len(X_test))]:
+            t0 = time.perf_counter()
+            model.predict([sample])
+            latencies.append((time.perf_counter() - t0) * 1000)
+        decision = model.predict(X_train)
+        report = classification_report(y_test, pred, labels=list(LABELS), output_dict=True, zero_division=0)
+        matrix = confusion_matrix(y_test, pred, labels=list(LABELS)).tolist()
+        try:
+            import pickle
+            model_size_mb = len(pickle.dumps(model, protocol=pickle.HIGHEST_PROTOCOL)) / (1024 * 1024)
+        except Exception:
+            model_size_mb = 0.0
+        results[name] = {
+            "accuracy": float(accuracy_score(y_test, pred)),
+            "macro_f1": float(f1_score(y_test, pred, labels=list(LABELS), average="macro", zero_division=0)),
+            "classification_report": report,
+            "confusion_matrix": matrix,
+            "latency": {
+                "p50_ms": float(np.percentile(latencies, 50)) if latencies else 0.0,
+                "p95_ms": float(np.percentile(latencies, 95)) if latencies else 0.0,
+            },
+            "train_seconds": float(train_seconds),
+            "model_size_mb": float(model_size_mb),
+            "generalization_gap_accuracy": float(accuracy_score(y_train, decision) - accuracy_score(y_test, pred)),
+        }
+        models[name] = model
+    return results, models
