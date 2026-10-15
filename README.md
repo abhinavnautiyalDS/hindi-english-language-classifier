@@ -63,3 +63,21 @@ Choose this repository, branch `main`, and entrypoint `app.py` in Streamlit Comm
 - Tatoeba English-Hindi sentence pairs, distributed by ManyThings.org under CC BY 2.0 France: https://mail.manythings.org/anki/hin-eng.zip
 
 Upstream sources: https://github.com/lingo-iitgn/COMI-LINGUA, https://huggingface.co/datasets/LingoIITGN/PHINC, and https://tatoeba.org/
+
+
+## Binary English/Hinglish training dashboard
+
+The Streamlit app now includes a binary experiment workflow for the voice-agent language-switching use case.
+
+```bash
+streamlit run app.py
+```
+
+- Filters the existing processed corpus to `english` and `hinglish`; pure `hindi` examples are excluded, not relabeled.
+- Lets you review caller-turn labels and export a verified CSV.
+- Appends only verified `text,label` call rows to the original training split. The original held-out corpus test remains unchanged.
+- Compares Logistic Regression, Linear SVM, SGD Log Loss, and Complement Naive Bayes.
+- Reports accuracy, macro-F1, train/test accuracy gap, per-class precision/recall/F1, confusion matrix, training time, p50/p95 prediction latency, and serialized model size.
+- Downloads the leading candidate as a `.joblib` artifact plus a JSON metrics report.
+
+Call transcript rows without verified labels are not automatically treated as ground truth. The corpus test score is not a substitute for a held-out call/speaker evaluation. For production claims, reserve whole calls or speakers that are never included in training.
