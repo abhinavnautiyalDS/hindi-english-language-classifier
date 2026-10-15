@@ -14,6 +14,12 @@
   "evaluation_note": "Binary corpus metrics evaluate English/Hinglish only. OTHER rejection needs separate multilingual, manually labelled validation before production claims.",
   "selected_model": "linear_svm",
   "train_rows": 29387,
+  "verified_call_rows_added": 0,
+  "original_dataset_sources": [
+    "COMI-LINGUA",
+    "PHINC",
+    "Tatoeba"
+  ],
   "test_rows": 9389,
   "train_label_counts": {
     "hinglish": 16504,
@@ -36,11 +42,11 @@
       "train_accuracy": 0.9742403103413074,
       "train_macro_f1": 0.9739284587644046,
       "generalization_gap_accuracy": 0.0035299045472931834,
-      "train_seconds": 7.1201252370000105,
+      "train_seconds": 7.237327794999999,
       "model_size_mb": 9.155963897705078,
       "latency": {
-        "p50_ms": 1.8601550000028055,
-        "p95_ms": 2.034895599979336,
+        "p50_ms": 1.8336589999989883,
+        "p95_ms": 1.9867364999996084,
         "n_calls": 1500
       },
       "classification_report": {
@@ -88,11 +94,11 @@
       "train_accuracy": 0.9962568482662402,
       "train_macro_f1": 0.9962012567336128,
       "generalization_gap_accuracy": 0.02394882824280853,
-      "train_seconds": 6.305158007000017,
+      "train_seconds": 5.931191603000002,
       "model_size_mb": 9.155853271484375,
       "latency": {
-        "p50_ms": 1.8695369999903733,
-        "p95_ms": 2.066311650018804,
+        "p50_ms": 1.8001960000049166,
+        "p95_ms": 1.9537394499877792,
         "n_calls": 1500
       },
       "classification_report": {
@@ -140,11 +146,11 @@
       "train_accuracy": 0.9863885391499643,
       "train_macro_f1": 0.9862092197872313,
       "generalization_gap_accuracy": 0.015145595279477564,
-      "train_seconds": 6.27677056600001,
+      "train_seconds": 5.9557075650000115,
       "model_size_mb": 9.156106948852539,
       "latency": {
-        "p50_ms": 1.878554999990456,
-        "p95_ms": 2.08077565001048,
+        "p50_ms": 1.8165809999999283,
+        "p95_ms": 1.9653600500092239,
         "n_calls": 1500
       },
       "classification_report": {
@@ -192,11 +198,11 @@
       "train_accuracy": 0.949705652159118,
       "train_macro_f1": 0.9493777887912649,
       "generalization_gap_accuracy": -0.008223839799557098,
-      "train_seconds": 6.077553352000024,
+      "train_seconds": 5.6846340460000135,
       "model_size_mb": 15.633281707763672,
       "latency": {
-        "p50_ms": 2.9304520000010825,
-        "p95_ms": 3.166425000016204,
+        "p50_ms": 2.860060499983774,
+        "p95_ms": 3.0503751500020826,
         "n_calls": 1500
       },
       "classification_report": {
