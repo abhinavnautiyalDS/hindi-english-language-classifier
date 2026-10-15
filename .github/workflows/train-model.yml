@@ -1,4 +1,4 @@
-name: Train and publish classifier model
+name: Train and publish classifier models
 
 on:
   push:
@@ -8,6 +8,8 @@ on:
       - "scripts/**"
       - "tests/**"
       - "train.py"
+      - "train_binary.py"
+      - "app.py"
       - "requirements.txt"
       - ".github/workflows/train-model.yml"
   workflow_dispatch:
@@ -39,17 +41,19 @@ jobs:
         run: python scripts/build_dataset.py
       - name: Run tests
         run: python -m pytest -q
-      - name: Train and evaluate models
+      - name: Train original three-class baseline
         run: python train.py
-      - name: Commit processed datasets, trained model, evaluation, and source attribution
+      - name: Train and compare binary English-Hinglish models
+        run: python train_binary.py
+      - name: Commit processed datasets, both models, evaluations, and attribution
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add models/language_classifier.joblib models/evaluation.json DATASET_ATTRIBUTION_TATOEBA.tsv data/processed/train.csv data/processed/test.csv data/processed/dataset_audit.json
+          git add models/language_classifier.joblib models/evaluation.json models/english_hinglish_classifier.joblib models/binary_evaluation.json DATASET_ATTRIBUTION_TATOEBA.tsv data/processed/train.csv data/processed/test.csv data/processed/dataset_audit.json
           if git diff --cached --quiet; then
             echo "No dataset, model, evaluation, or attribution changes to commit."
           else
-            git commit -m "Publish curated Hindi-English datasets and trained classifier"
+            git commit -m "Publish curated datasets and trained Hindi-English classifiers"
             git fetch origin main
             git rebase origin/main
             git push origin HEAD:main
