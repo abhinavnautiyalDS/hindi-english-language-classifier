@@ -1,83 +1,58 @@
-# Hindi-English Language Classifier
+# English / Hinglish Language Classifier
 
-Low-latency sentence-level classification for Hindi, English, and Hinglish text, designed for transcripts produced by Indian voice-agent STT systems.
+Lightweight CPU classifier for finalized voice-agent STT utterances. The binary model distinguishes English from Hinglish and has an explicit **OTHER** rejection outcome so unsupported inputs are not always forced into one of the two classes.
 
-## Train on curated public data
+## Important behavior
 
-The training pipeline combines three datasets:
+The trained text model is binary: `english` and `hinglish`. A rejection wrapper adds `other`:
+- Utterances containing letters from a non-Latin script (for example Telugu or Devanagari/Hindi) return `other`.
+- Latin-script utterances whose LinearSVC decision margin is below 0.35 return `other`.
+- Other confident Latin-script text can still be confused with English/Hinglish. This is not universal language identification; add manually labelled examples from the actual languages you need to reject and evaluate them separately.
 
-1. **COMI-LINGUA** from the Lingo Research Group at IIT Gandhinagar. Human annotator tags are preferred over predicted tags.
-2. **PHINC**, a 13,738-pair corpus of Romanized Hinglish social-media text and human English translations.
-3. **Tatoeba English-Hindi sentence pairs**, distributed by ManyThings.org, to strengthen the monolingual Hindi and English classes. Attribution metadata is retained in DATASET_ATTRIBUTION_TATOEBA.tsv.
+**Do not interpret OTHER as Hindi.** Your voice-agent orchestration should handle it explicitly (for example, ask the caller to repeat in English/Hinglish or route to a multilingual path) rather than silently changing it to Hindi.
 
-The pipeline downloads source files, cleans text, derives sentence labels, keeps translation pairs together during splitting, removes exact train/test overlap, compares Logistic Regression with Linear SVM, and saves evaluation metrics.
+## Why the previous behavior happened
+
+The earlier classifier had only two labels, English and Hinglish. A binary classifier must choose one of them for any input, even Telugu, Hindi, or unrelated text. That is why Telugu-script input could be returned as ENGLISH. The new wrapper rejects non-Latin scripts and low-margin inputs as OTHER, but it does not replace a real multilingual language-identification dataset.
+
+## Streamlit
+
+The app is `app.py` on `main`:
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Tabs include prediction/batch CSV, manually verified call-label review, model comparison, legacy baseline and integration notes. Do not treat model predictions as ground truth when reviewing transcripts.
+
+## Training and evaluation
 
 ```bash
-python -m venv .venv
-# Windows: .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
 python scripts/build_dataset.py
 python -m pytest -q
 python train.py
-streamlit run app.py
+python train_binary.py
 ```
 
-The cleaned, labeled datasets are committed at [`data/processed/train.csv`](data/processed/train.csv) and [`data/processed/test.csv`](data/processed/test.csv), with provenance and cleaning counts in [`data/processed/dataset_audit.json`](data/processed/dataset_audit.json). Raw upstream downloads remain excluded from Git; the build script downloads them when rebuilding the corpus. GitHub Actions refreshes the processed files when the training workflow runs.
+The binary training script compares Logistic Regression, Linear SVM, SGD Log Loss and Complement Naive Bayes, then persists the top candidate behind the OTHER rejection wrapper. Corpus metrics cover English/Hinglish examples only; they do not measure OTHER detection.
 
-## Label design
+Latest evaluation report: [models/binary_evaluation.json](models/binary_evaluation.json). Public-corpus accuracy is not production-call accuracy. Use manually verified, consented, anonymized, speaker/call-separated STT transcripts for validation. Include Telugu, Hindi, and any other languages expected in deployment as explicit OTHER test cases.
 
-See [DATASET_CARD.md](DATASET_CARD.md) for full source details, citations, license notes, and limitations.
+## Voice-agent integration
 
-- COMI-LINGUA tags are token-level. For each annotator, Hindi token ratio >= 80% maps to `hindi`, English token ratio >= 80% maps to `english`, and the rest maps to `hinglish`. Majority vote determines the label; ties are discarded.
-- PHINC Hinglish source sentences map to `hinglish`; their human English translations map to `english`.
-- Tatoeba Hindi and English sentences map to `hindi` and `english`, respectively.
-
-These are project-defined sentence-level labels, not a label schema natively supplied by every source.
-
-## Evaluation
-
-`models/evaluation.json` includes accuracy, macro-F1, per-class precision/recall/F1, confusion matrices, training time, and p50/p95 single-transcript classifier latency. Evaluation combines the held-out COMI-LINGUA split with held-out PHINC and Tatoeba subsets split by paired row, after removing exact train/test text overlap.
-
-**These are text-corpus metrics, not production validation.** These corpora do not guarantee coverage of the exact STT engine, spoken-call conditions, regional accents, short acknowledgements, interruptions, or ASR substitutions. Before production, evaluate on consented, anonymized, speaker-separated transcripts from the target STT pipeline and keep that test set separate from training.
-
-## Run the API
-
-After training:
-
-```bash
-uvicorn api:app --host 0.0.0.0 --port 8000
+Load `models/english_hinglish_classifier.joblib` and classify each **finalized caller turn** before selecting the response language:
+```python
+import joblib
+model = joblib.load("models/english_hinglish_classifier.joblib")
+label = model.predict([finalized_stt_utterance])[0]  # english | hinglish | other
 ```
 
-- `GET /health`
-- `POST /predict` with JSON such as `{"text":"sir mujhe fees details chahiye"}`
+Update language state per turn, not only at call start. For `other`, do not map to Hindi or Hinglish; follow a deliberate fallback. Log STT-final, classifier start/end, LLM start/end and TTS start/end to separate classifier errors from orchestration lag and network latency.
 
-## Streamlit deployment
+## Data sources
 
-Choose this repository, branch `main`, and entrypoint `app.py` in Streamlit Community Cloud. The trained model and evaluation report are generated by GitHub Actions.
+- COMI-LINGUA: https://aclanthology.org/2025.findings-emnlp.422/
+- PHINC: https://aclanthology.org/2020.wnut-1.7/
+- Tatoeba English-Hindi pairs: https://mail.manythings.org/anki/hin-eng.zip
 
-## Citations and licenses
-
-- Sheth, Rajvee; Beniwal, Himanshu; Singh, Mayank (2025). “COMI-LINGUA: Expert Annotated Large-Scale Dataset for Multitask NLP in Hindi-English Code-Mixing.” Findings of EMNLP 2025. https://aclanthology.org/2025.findings-emnlp.422/
-- Srivastava, Vivek; Singh, Mayank (2020). “PHINC: A Parallel Hinglish Social Media Code-Mixed Corpus for Machine Translation.” W-NUT 2020. https://aclanthology.org/2020.wnut-1.7/
-- Tatoeba English-Hindi sentence pairs, distributed by ManyThings.org under CC BY 2.0 France: https://mail.manythings.org/anki/hin-eng.zip
-
-Upstream sources: https://github.com/lingo-iitgn/COMI-LINGUA, https://huggingface.co/datasets/LingoIITGN/PHINC, and https://tatoeba.org/
-
-
-## Binary English/Hinglish training dashboard
-
-The Streamlit app now includes a binary experiment workflow for the voice-agent language-switching use case.
-
-```bash
-streamlit run app.py
-```
-
-- Filters the existing processed corpus to `english` and `hinglish`; pure `hindi` examples are excluded, not relabeled.
-- Lets you review caller-turn labels and export a verified CSV.
-- Appends only verified `text,label` call rows to the original training split. The original held-out corpus test remains unchanged.
-- Compares Logistic Regression, Linear SVM, SGD Log Loss, and Complement Naive Bayes.
-- Reports accuracy, macro-F1, train/test accuracy gap, per-class precision/recall/F1, confusion matrix, training time, p50/p95 prediction latency, and serialized model size.
-- Downloads the leading candidate as a `.joblib` artifact plus a JSON metrics report.
-
-Call transcript rows without verified labels are not automatically treated as ground truth. The corpus test score is not a substitute for a held-out call/speaker evaluation. For production claims, reserve whole calls or speakers that are never included in training.
+The training corpus is not a substitute for a representative, manually labelled multilingual call test set.
