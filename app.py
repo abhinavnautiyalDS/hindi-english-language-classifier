@@ -84,7 +84,7 @@ with tabs[2]:
                 train=train[~train.text.str.casefold().isin(test_text)].drop_duplicates("text").reset_index(drop=True)
                 removed=before-len(train)
                 results,models=evaluate_candidates(train,test)
-                table=pd.DataFrame([{"model":n,"accuracy":r["accuracy"],"macro_f1":r["macro_f1"],"p50_ms":r["latency"]["p50_ms"],"p95_ms":r["latency"]["p95_ms"],"train_seconds":r["train_seconds"]} for n,r in results.items()]).sort_values(["macro_f1","p95_ms"],ascending=[False,True]).reset_index(drop=True)
+                table=pd.DataFrame([{"model":n,"accuracy":r["accuracy"],"macro_f1":r["macro_f1"],"p50_ms":r["latency"]["p50_ms"],"p95_ms":r["latency"]["p95_ms"],"train_seconds":r["train_seconds"],"model_size_mb":r["model_size_mb"],"generalization_gap":r["generalization_gap_accuracy"]} for n,r in results.items()]).sort_values(["macro_f1","p95_ms"],ascending=[False,True]).reset_index(drop=True)
                 best=str(table.iloc[0].model); st.session_state["binary_model"]=models[best]
                 st.session_state["binary_results"]=results
                 st.success(f"Best candidate: {best}. Verified call rows added: {added}; duplicate/test-overlap rows removed: {removed}.")
