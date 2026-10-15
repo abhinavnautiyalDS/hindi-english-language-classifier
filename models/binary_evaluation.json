@@ -1,11 +1,17 @@
 {
-  "task": "binary English vs Hinglish",
+  "task": "English vs Hinglish with OTHER rejection",
   "labels": [
+    "english",
+    "hinglish",
+    "other"
+  ],
+  "training_labels": [
     "english",
     "hinglish"
   ],
+  "other_policy": "Non-Latin-script letters -> other; Latin-script LinearSVC margin < 0.35 -> other. This is not a universal language detector.",
   "dataset": "Repository processed corpus filtered to English and Hinglish; pure Hindi excluded",
-  "evaluation_note": "Public-corpus held-out scores are not production-call validation. Validate on manually labeled, speaker/call-separated STT transcripts.",
+  "evaluation_note": "Binary corpus metrics evaluate English/Hinglish only. OTHER rejection needs separate multilingual, manually labelled validation before production claims.",
   "selected_model": "linear_svm",
   "train_rows": 29387,
   "test_rows": 9389,
@@ -30,11 +36,11 @@
       "train_accuracy": 0.9742403103413074,
       "train_macro_f1": 0.9739284587644046,
       "generalization_gap_accuracy": 0.0035299045472931834,
-      "train_seconds": 4.690284306999999,
-      "model_size_mb": 9.15597915649414,
+      "train_seconds": 7.1201252370000105,
+      "model_size_mb": 9.155963897705078,
       "latency": {
-        "p50_ms": 0.877663999993672,
-        "p95_ms": 0.9937080000057108,
+        "p50_ms": 1.8601550000028055,
+        "p95_ms": 2.034895599979336,
         "n_calls": 1500
       },
       "classification_report": {
@@ -82,11 +88,11 @@
       "train_accuracy": 0.9962568482662402,
       "train_macro_f1": 0.9962012567336128,
       "generalization_gap_accuracy": 0.02394882824280853,
-      "train_seconds": 4.154529757999995,
+      "train_seconds": 6.305158007000017,
       "model_size_mb": 9.155853271484375,
       "latency": {
-        "p50_ms": 0.8638929999946754,
-        "p95_ms": 0.9857000000039307,
+        "p50_ms": 1.8695369999903733,
+        "p95_ms": 2.066311650018804,
         "n_calls": 1500
       },
       "classification_report": {
@@ -134,11 +140,11 @@
       "train_accuracy": 0.9863885391499643,
       "train_macro_f1": 0.9862092197872313,
       "generalization_gap_accuracy": 0.015145595279477564,
-      "train_seconds": 3.889960243999994,
+      "train_seconds": 6.27677056600001,
       "model_size_mb": 9.156106948852539,
       "latency": {
-        "p50_ms": 0.8677180000020712,
-        "p95_ms": 0.9883419999979992,
+        "p50_ms": 1.878554999990456,
+        "p95_ms": 2.08077565001048,
         "n_calls": 1500
       },
       "classification_report": {
@@ -186,11 +192,11 @@
       "train_accuracy": 0.949705652159118,
       "train_macro_f1": 0.9493777887912649,
       "generalization_gap_accuracy": -0.008223839799557098,
-      "train_seconds": 3.7679121510000044,
+      "train_seconds": 6.077553352000024,
       "model_size_mb": 15.633281707763672,
       "latency": {
-        "p50_ms": 1.4979989999943655,
-        "p95_ms": 1.6739800500090496,
+        "p50_ms": 2.9304520000010825,
+        "p95_ms": 3.166425000016204,
         "n_calls": 1500
       },
       "classification_report": {
